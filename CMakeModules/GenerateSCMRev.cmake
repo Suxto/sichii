@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# SPDX-FileCopyrightText: 2019 yuzu Emulator Project
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 # generate git/build information
@@ -42,9 +43,9 @@ set(BUILD_AUTO_UPDATE_API_PATH "/repos/zortos293/Lichii/releases?per_page=100")
 set(BUILD_AUTO_UPDATE_WEBSITE "https://github.com")
 set(BUILD_AUTO_UPDATE_REPO "zortos293/Lichii")
 if (NIGHTLY_BUILD)
-    set(REPO_NAME "Lichii Nightly")
+    set(REPO_NAME "Sichii Nightly")
 else()
-    set(REPO_NAME "Lichii")
+    set(REPO_NAME "Sichii")
 endif()
 
 set(BUILD_ID ${GIT_REFSPEC})

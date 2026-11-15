@@ -1,4 +1,4 @@
-name: Sync upstream and build
+name: Sync Lichii Mainline
 
 on:
   schedule:
@@ -10,7 +10,7 @@ permissions:
   actions: write
 
 concurrency:
-  group: sync-upstream-renhdrum
+  group: sync-sichii-mainline
   cancel-in-progress: false
 
 jobs:
@@ -19,21 +19,46 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: renhdrum-test
+          ref: sichii-main
           fetch-depth: 0
-      - name: Merge upstream and build when changed
+      - name: Apply the latest successful Lichii mainline build
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          git remote add upstream https://github.com/zortos293/Lichii.git
-          git fetch upstream nx2
-          if git merge-base --is-ancestor FETCH_HEAD HEAD; then
-            echo 'Already up to date'
+          upstream=zortos293/Lichii
+          version_file=.github/sichii-upstream-build.txt
+          current=$(tr -d '\r\n' < "$version_file")
+          sha_file=.github/sichii-upstream-sha.txt
+          base=$(tr -d '\r\n' < "$sha_file")
+          read -r number head < <(gh run list --repo "$upstream" \
+            --workflow release-binaries.yml --branch nx2 --status success --limit 1 \
+            --json number,headSha --jq '.[] | [.number,.headSha] | @tsv')
+          latest="build-$number"
+          if [[ ! "$base" =~ ^[0-9a-f]{40}$ || ! "$head" =~ ^[0-9a-f]{40}$ ||
+                ! "$current" =~ ^build-[1-9][0-9]*$ || ! "$latest" =~ ^build-[1-9][0-9]*$ ]]; then
+            echo "Invalid upstream build metadata" >&2
+            exit 1
+          fi
+          if (( number <= ${current#build-} )); then
+            echo "Sichii already tracks $current."
             exit 0
           fi
+          git fetch --no-tags "https://github.com/$upstream.git" "$base" "$head"
+          git merge-base --is-ancestor "$base" "$head"
+          # Keep Sichii's workflows under local control. The default Actions token can
+          # push a commit with code changes, but cannot push upstream workflow changes.
+          git diff --binary --full-index --find-renames \
+            "$base" "$head" \
+            -- . ':(exclude).github/workflows/**' > "$RUNNER_TEMP/upstream.patch"
+          if [[ -s "$RUNNER_TEMP/upstream.patch" ]]; then
+            git apply --3way --index "$RUNNER_TEMP/upstream.patch"
+          fi
+          printf '%s\n' "$latest" > "$version_file"
+          printf '%s\n' "$head" > "$sha_file"
+          git add "$version_file" "$sha_file"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git merge --no-edit FETCH_HEAD
-          git push origin HEAD:renhdrum-test
-          gh workflow run release-binaries.yml --ref renhdrum-test -f publish_release=false
+          git commit -m "Sync Lichii $latest"
+          git push origin HEAD:sichii-main
+          gh workflow run release-binaries.yml --ref sichii-main
